@@ -24,9 +24,10 @@ library(plotly)
 
 #saveRDS(df, "df.rds")
 
-setwd("/Users/usr/Desktop/")
+#setwd("/Users/usr/Desktop/")
+setwd("~/GitHub/sba-1")
 
-t <- readRDS("/Users/usr/Desktop/tbl_df_nyc.rds")
+t <- readRDS("tbl_df_nyc.rds")
 
 summary(t)
 
@@ -36,14 +37,14 @@ d <- filter(t, type != "DIS")
 d <- filter(d, amount > 0)
 
 d <- mutate(d , ptype = case_when(
-  type == "CRD" | type == "CRE" ~  "CREDIT",
+  type == "CRD" | type == "CRE" ~  "CREDIT CARD",
   type == "CAS" | type == "CSH" ~  "CASH",
   type == "NA " | type == "UNK" ~  "UNKNOWN",
   type == "NOC" | type == "NO " ~  "NO CHARGE",
   TRUE ~ "OTHER"
 ))
 
-d <- filter(d , ptype == "CREDIT" | ptype == "CASH")
+d <- filter(d , ptype == "CREDIT CARD" | ptype == "CASH")
 
 ## remove raw type row
 d <- d[, c(1, 3, 4)]
@@ -51,8 +52,31 @@ d <- d[, c(1, 3, 4)]
 summary(d)
 
 by_date_type <- group_by(d, date, ptype)
-by_date_type$amount <- by_date_type$amount / 1000
+by_date_type$amount <- by_date_type$amount
 
-g <- ggplot(by_date_type, aes(x = date, y = amount, col = ptype))
-g + geom_point() + theme(axis.text.x = element_text(angle = 75, hjust = 1))
+library(lubridate)
+
+by_date_type <- mutate(by_date_type, dtm = lubridate::parse_date_time(date, "y-m"))
+by_date_type <- mutate(by_date_type, year = lubridate::year(dtm))
+
+by_date_type_year <- group_by(by_date_type, year, ptype)
+                       
+s <- summarise(by_date_type_year, sum(amount))
+s$Payment <- as.factor(s$ptype)
+s$year <- as.factor(s$year)
+s <- mutate(s, Amount = `sum(amount)`/1000000)
+
+##g <- ggplot(by_date_type, aes(x = date, y = amount, col = ptype))
+##g + geom_point() + theme(axis.text.x = element_text(angle = 75, hjust = 1))
+##g + geom_point() + theme(axis.text.x = element_text(angle = 75, hjust = 1))
+
+library(ggthemes)
+
+g <- ggplot(s, aes(x = year, y = Amount))
+g <- g + geom_bar(aes(fill = Payment), stat = "identity")
+g <- g + theme_economist()
+g <- g + labs(x = "Year", y = "Total amount (in millions USD)") + ggtitle("NYC Yellow Taxi Payments over time")
+g
+
+
 
